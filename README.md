@@ -8,8 +8,10 @@
 
 The goal of MAIHDA_opencode is to host the elements of analytical code
 that underpin the publication ‘Intersectional inequalities in late
-diagnosis of colorectal cancer in England, 2013 to 2019’, submitted to
-JECH in late 2024
+diagnosis of colorectal cancer in England, 2013 to 2019’, submitted for
+publication in late 2024. This work is a collaboration between the
+National Disease Registration Service and colleagues at the University
+of Sheffield.
 
 This code has been adapted slightly from the working repository of that
 project to protect organisational information or individual analysts’

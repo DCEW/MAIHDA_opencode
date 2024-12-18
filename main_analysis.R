@@ -1,6 +1,6 @@
 #Main analysis
 
-# Main analysis restricted to patients for whom
+# Main analysis will use firstcan dataset - so restricted to patients for whom
 #this dx is their first ever C-code cancer diagnosis
 
 # 1. Unstaged = EARLY analysis -------------------------------------------------------------------
@@ -67,7 +67,7 @@ label(events$table_stage) <- "Stage at diagnosis"
 length(events$stage_best[events$stage_best == "X"])/nrow(events) * 100
 t1 <- table1::table1(~ agegrp + gender + eth + imd | table_stage, data = events)
 kable(t1) 
-write.csv(t1, paste0(Sys.getenv("MAIHDA_out"), "/Table1_SA2.csv"), row.names = FALSE)
+write.csv(t1, paste0(Sys.getenv("MAIHDA_out"), "/Table1_main.csv"), row.names = FALSE)
 
 #sensible default levels
 events <- within(events, eth <- relevel(eth, ref = "White"))
@@ -96,12 +96,13 @@ model2_log_colo <- glmmTMB::glmmTMB(stage ~ eth + agegrp + gender + imd +
                                       (1|stratum), data=events, family=binomial)
 #get the L2 variance with more decimal places than the table gives
 ##b) L2----
-l2_late <- as.data.frame(VarCorr(model2_log_colo)[["cond"]][["stratum"]]) 
+l2_main <- as.data.frame(VarCorr(model2_log_colo)[["cond"]][["stratum"]]) 
+write.csv(l2_main, file = paste0(Sys.getenv("MAIHDA_out"), "/L2_main.csv"))
 
 #Get the estimates as Odds ratios (and SEs on the odds scale)
-tab_model(model2_log_colo, digits.re=8, show.se=T,
-          file = paste0(Sys.getenv("MAIHDA_out"), "/Model2_late.doc"),
-          show.reflvl = TRUE)
+# tab_model(model2_log_colo, digits.re=8, show.se=T,
+#           file = paste0(Sys.getenv("MAIHDA_out"), "/Model2_late.doc"),
+#           show.reflvl = TRUE)
 
 #predict the fitted linear predictor (on the probability scale)
 events$m2Bmfit <- predict(model2_log_colo, type = "response")
@@ -128,13 +129,16 @@ stratum_level <-
            m2Bmlwr, m2BmfitL, m2BmseL) |>
   summarise(stage = mean(as.numeric(stage), na.rm = T))
 
+
 # convert the outcome from a proportion to a percentage
 stratum_level$stage <- stratum_level$stage*100
 
 # Table 2: Calculate stratum-level descriptive statistics
 
+
 # generate binary indicators for whether each stratum has more than X 
 # individuals
+#summary(stratum_level$strataN)
 stratum_level$n100plus <- ifelse(stratum_level$strataN>=100, 1,0)
 stratum_level$n50plus <- ifelse(stratum_level$strataN>=50, 1,0)
 stratum_level$n30plus <- ifelse(stratum_level$strataN>=30, 1,0)
@@ -153,12 +157,12 @@ table2 <- data.frame("Sample Size Per Stratum" = c("100 or more","50 or more","3
 
 
 kable(table2)
-write.csv(table2, file = paste0(Sys.getenv("MAIHDA_out"), "/Table_2_SA2.csv"))
+write.csv(table2, file = paste0(Sys.getenv("MAIHDA_out"), "/Table_2_main.csv"))
 
 # Get the estimates as Odds ratios (and SEs on the odds scale)
 ##d) Models----
 tab_model(model1_log_colo, model2_log_colo, show.se=T,
-          file = paste0(Sys.getenv("MAIHDA_out"), "/Model_1and2_SA2.doc"),
+          file = paste0(Sys.getenv("MAIHDA_out"), "/Model_1and2_main.doc"),
           show.reflvl = TRUE)
 
 # Calculate the area under the receiver operating characteristic (ROC) curve
@@ -182,21 +186,23 @@ AUC2BF
 
 # Panel B - histogram of the observed stratum means
 ##f) histogram ----
-png(paste0(Sys.getenv("MAIHDA_out"), "/Obs_stratummeans_SA2.png"),
-    res = 72)
+jpeg(paste0(Sys.getenv("MAIHDA_out"), "/Obs_stratummeans_main.jpeg"), 
+     width = 6, height = 5, units = "in", res = 300)
+# png(paste0(Sys.getenv("MAIHDA_out"), "/Obs_stratummeans_main.png"),
+#     res = 72)
 ggplot(stratum_level, aes(x=stage)) + 
   geom_histogram(aes(y = after_stat(count / sum(count))), binwidth=2, 
                  boundary=22) + 
   scale_y_continuous(labels=scales::percent) +
   ylab("Percentage of strata") +
   xlab("Percentage of Advanced Stage Colorectal Cancer Diagnoses") +
-  geom_vline(aes(xintercept=mean(stage))) + 
-  annotate("text", x=55, y=0.2, size= 4,label=paste0("Grand Mean = ", round(mean(as.numeric(events$stage))*100, 1), "%")) +
+  geom_vline(aes(xintercept=mean(stage))) + #this is the grand mean
+  annotate("text", x=55, y=0.2, size= 4,label=paste0("Grand Mean = ", round(mean(as.numeric(stratum_level$stage)), 1), "%")) +
   theme_bw() +
-  labs(title = "Histogram of Percentage of Advanced Stage Colorectal Cancer Diagnoses") +
+  labs(title = "Histogram of Percentage of Advanced Stage Colorectal\nCancer Diagnoses") +
   theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 12),
-        title = element_text(size = 12))
+        title = element_text(size = 10))
 dev.off()
 
 # Panel B
@@ -213,8 +219,8 @@ stratum_level$m2Bmlwr <- stratum_level$m2Bmlwr * 100
 
 # Plot the caterpillar plot of the predicted stratum means
 ##g) predicted percent----
-png(paste0(Sys.getenv("MAIHDA_out"), "/predicted_percentage_SA2.png"),
-    res = 72)
+jpeg(paste0(Sys.getenv("MAIHDA_out"), "/predicted_percentage_main.jpeg"), 
+     width = 6, height = 5, units = "in", res = 300)
 stratum_level |>
   filter(nlessthan10 == 0) |>
   ggplot(aes(y=m2Bmfit, x=rank2)) +
@@ -245,12 +251,8 @@ highest <- top <- stratum_level |> ungroup() |> slice_max(m2Bmfit, n=6) |>
   mutate("Predicted proportion of late stage diagnoses" = round(`Predicted proportion of late stage diagnoses`, 2))
 
 both <- bind_rows(lowest, highest)
-write.csv(both, paste0(Sys.getenv("MAIHDA_out"), "/both_SA2.csv"), row.names = F)
+write.csv(both, paste0(Sys.getenv("MAIHDA_out"), "/both_main.csv"), row.names = F)
 kable(both) 
-
-
-# from section 7 of https://www.rpubs.com/Hailstone/388481
-
 
 # caterpillar plot
 
@@ -287,8 +289,8 @@ caterpillar_data$intercepts_quintile <- fct_rev(factor(ntile(caterpillar_data$in
 
 # Difference in Predicted Percent Advanced stage diagnosis due to Interactions
 ##i) catepillar logit -----
-png(paste0(Sys.getenv("MAIHDA_out"), "/Caterpillar_logit_SA2.png"),
-    res = 72)
+jpeg(paste0(Sys.getenv("MAIHDA_out"), "/Caterpillar_logit_main.jpeg"),
+     width = 6, height = 5, units = "in", res = 300)
 ggplot(caterpillar_data,
        aes(stratum,
            intercepts,
@@ -298,7 +300,7 @@ ggplot(caterpillar_data,
   geom_errorbar(aes(ymin=lcl, ymax=ucl)) +
   scale_colour_manual(values=c("grey", "#0571b0","#ca0020")) +
   xlab("Stratum Rank") +
-  ylab("Difference in Predicted Percent Advanced Stage Colorectal Cancer Diagnosis due to Interactions") +
+  ylab("Difference in Predicted Percent Advanced Stage\nColorectal Cancer Diagnosis due to Interactions") +
   theme(axis.text = element_text(size= 12),
         axis.text.x = element_blank(),
         legend.position = "none",
@@ -308,7 +310,7 @@ dev.off()
 #significant strata based on logit
 sig <- caterpillar_data |> 
   filter((ucl>0 & lcl >0|(ucl<0 & lcl < 0)))
-write.csv(sig, paste0(Sys.getenv("MAIHDA_out"), "/significant_strata_logit_SA2.csv"))
+write.csv(sig, paste0(Sys.getenv("MAIHDA_out"), "/significant_strata_logit_main.csv"))
 
 stratumsim <- rbind(stratum_level, 
                     stratum_level[rep(1:nrow(stratum_level),999),])
@@ -333,8 +335,8 @@ stratumsim2$category <- ifelse(stratumsim2$lo > 0, "High",
 
 # plot the caterpillar plot of the predicted stratum percentage differences
 ##j) catepillar probability----
-png(paste0(Sys.getenv("MAIHDA_out"), "/Caterpillar_probability_SA2.png"),
-    res = 72)
+jpeg(paste0(Sys.getenv("MAIHDA_out"), "/Caterpillar_probability_main.jpeg"),
+     width = 6, height = 5, units = "in", res = 300)
 ggplot(stratumsim2, aes(x=rank, y=mean, colour = category)) +
   geom_hline(yintercept=0, color="red", linewidth=1) +
   geom_point(size=4) +
@@ -352,4 +354,5 @@ dev.off()
 
 sig <- stratumsim2 |> 
   filter((hi>0 & lo >0|(hi<0 & lo < 0)))
-write.csv(sig, paste0(Sys.getenv("MAIHDA_out"), "/significant_strata_prob_SA2.csv"))
+write.csv(sig, paste0(Sys.getenv("MAIHDA_out"), "/significant_strata_prob_main.csv"))
+
