@@ -39,14 +39,14 @@ from av2022.at_tumour_england@casref01 t
 where 
 	t.ctry_code = 'E' -- England residents using country code 
 	and t.statusofregistration = 'F' -- Finalised cases 
-	and t.age between 0 and 200 -- Sensible age 
+	and t.age between 0 and 200 -- 
 	and t.gender in ('1','2') -- Known gender
 	-- Years of interest
 	and t.diagnosisyear between 2013 and 2022
 	-- Site restrictions
 
 	and s.ndrs_main in ('Colorectal')
-	    --- Exclude records in at_transformation_haem_england, as these are (not-primary) haematological neoplasms but they are note excluded above as ndrs_main is null 
+	    --- Exclude records in at_transformation_haem_england, as these are (not-primary) haematological neoplasms but they are not excluded above as ndrs_main is null 
 	and th.transformed_id is null 
 
 )
